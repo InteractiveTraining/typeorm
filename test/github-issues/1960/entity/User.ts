@@ -21,4 +21,7 @@ export class User {
 
     @Column("datetime", { nullable: true })
     public date2: Date;
+    
+    @Column("timestamp")
+    public secondTimestamp: Date;
 }

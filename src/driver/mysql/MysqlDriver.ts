@@ -698,13 +698,45 @@ export class MysqlDriver implements Driver {
 
         return Object.keys(generatedMap).length > 0 ? generatedMap : undefined;
     }
+    
+    /**
+     * https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_explicit_defaults_for_timestamp
+     *
+     * If explicit_defaults_for_timestamp is disabled:
+     *  The first TIMESTAMP column in a table - onUpdate=CURRENT_TIMESTAMP / default=CURRENT_TIMESTAMP
+     *  TIMESTAMP columns following the first one - onUpdate=undefined / default=0000-00-00 00:00:00
+     *
+     * If explicit_defaults_for_timestamp is enabled:
+     *  TODO If explicit_defaults_for_timestamp is enabled
+     */
+    getDefaultsForTimestamp(isFirstColumn: boolean, columnMetadata: ColumnMetadata) {
+        let columnDefault = this.normalizeDefault(columnMetadata), onUpdate = columnMetadata.onUpdate;
+        
+        if (columnMetadata.type === "timestamp") {
+            if (isFirstColumn && !onUpdate) {
+                onUpdate = "CURRENT_TIMESTAMP";
+            } else if (!onUpdate) {
+                onUpdate = undefined;
+            }
+    
+            if (isFirstColumn && !columnDefault) {
+                columnDefault = "CURRENT_TIMESTAMP";
+            } else if (!columnDefault) {
+                columnDefault = "0000-00-00 00:00:00";
+            }
+        }
+    
+    
+        return {default: columnDefault, onUpdate: onUpdate};
+    }
 
     /**
      * Differentiate columns of this table and columns from the given column metadatas columns
      * and returns only changed.
      */
     findChangedColumns(tableColumns: TableColumn[], columnMetadatas: ColumnMetadata[]): ColumnMetadata[] {
-        return columnMetadatas.filter(columnMetadata => {
+        const firstTimestampColumn = tableColumns.findIndex(c => c.type === "timestamp");
+        return columnMetadatas.filter((columnMetadata, columnIndex) => {
             const tableColumn = tableColumns.find(c => c.name === columnMetadata.databaseName);
             if (!tableColumn)
                 return false; // we don't need new columns, we only need exist and changed
@@ -731,12 +763,14 @@ export class MysqlDriver implements Driver {
             // console.log("isGenerated:", tableColumn.isGenerated, columnMetadata.isGenerated);
             // console.log((columnMetadata.generationStrategy !== "uuid" && tableColumn.isGenerated !== columnMetadata.isGenerated));
             // console.log("==========================================");
-
+            
+            const defaultsForTimestamp = this.getDefaultsForTimestamp(firstTimestampColumn === columnIndex, columnMetadata);
+    
             let columnMetadataLength = columnMetadata.length;
             if (!columnMetadataLength && columnMetadata.generationStrategy === "uuid") { // fixing #3374
                 columnMetadataLength = this.getColumnLength(columnMetadata);
             }
-
+            
             return tableColumn.name !== columnMetadata.databaseName
                 || tableColumn.type !== this.normalizeType(columnMetadata)
                 || tableColumn.length !== columnMetadataLength
@@ -748,9 +782,9 @@ export class MysqlDriver implements Driver {
                 || tableColumn.asExpression !== columnMetadata.asExpression
                 || tableColumn.generatedType !== columnMetadata.generatedType
                 // || tableColumn.comment !== columnMetadata.comment // todo
-                || !this.compareDefaultValues(this.normalizeDefault(columnMetadata), tableColumn.default)
+                || !this.compareDefaultValues(defaultsForTimestamp.default, tableColumn.default)
                 || (tableColumn.enum && columnMetadata.enum && !OrmUtils.isArraysEqual(tableColumn.enum, columnMetadata.enum.map(val => val + "")))
-                || tableColumn.onUpdate !== columnMetadata.onUpdate
+                || tableColumn.onUpdate !== defaultsForTimestamp.onUpdate
                 || tableColumn.isPrimary !== columnMetadata.isPrimary
                 || tableColumn.isNullable !== columnMetadata.isNullable
                 || tableColumn.isUnique !== this.normalizeIsUnique(columnMetadata)
