@@ -527,7 +527,7 @@ export class MysqlDriver implements Driver {
             return "varchar";
 
         } else if (column.type === "simple-array" || column.type === "simple-json") {
-            return "text";
+            return "longtext";
 
         } else if (column.type === "simple-enum") {
             return "enum";
@@ -740,12 +740,54 @@ export class MysqlDriver implements Driver {
             if (!columnMetadataLength && columnMetadata.generationStrategy === "uuid") { // fixing #3374
                 columnMetadataLength = this.getColumnLength(columnMetadata);
             }
+    
+            // if (tableColumn.name === "sentAt") {
+            //     console.log("1", {
+            //         name: tableColumn.name,
+            //         type: tableColumn.type,
+            //         length: tableColumn.length,
+            //         width: tableColumn.width,
+            //         precision: tableColumn.precision,
+            //         scale: tableColumn.scale,
+            //         zerofill: tableColumn.zerofill,
+            //         unsigned: tableColumn.unsigned,
+            //         asExpression: tableColumn.asExpression,
+            //         generatedType: tableColumn.generatedType,
+            //         default: tableColumn.default,
+            //         onUpdate: tableColumn.onUpdate,
+            //         isPrimary: tableColumn.isPrimary,
+            //         isNullable: tableColumn.isNullable,
+            //         isUnique: tableColumn.isUnique,
+            //         isGenerated: tableColumn.isGenerated,
+            //     });
+            //     console.log("2", {
+            //         name: columnMetadata.databaseName,
+            //         type: this.normalizeType(columnMetadata),
+            //         length: columnMetadataLength,
+            //         width: columnMetadata.width,
+            //         precision: columnMetadata.precision,
+            //         scale: columnMetadata.scale,
+            //         zerofill: columnMetadata.zerofill,
+            //         unsigned: columnMetadata.unsigned,
+            //         asExpression: columnMetadata.asExpression,
+            //         generatedType: columnMetadata.generatedType,
+            //         default: this.normalizeDefault(columnMetadata),
+            //         onUpdate: columnMetadata.onUpdate,
+            //         isPrimary: columnMetadata.isPrimary,
+            //         isNullable: columnMetadata.isNullable,
+            //         isUnique: this.normalizeIsUnique(columnMetadata),
+            //         isGenerated: columnMetadata.isGenerated,
+            //         generationStrategy: columnMetadata.generationStrategy
+            //     });
+            //
+            //     return false;
+            // }
 
             return tableColumn.name !== columnMetadata.databaseName
                 || tableColumn.type !== this.normalizeType(columnMetadata)
                 || tableColumn.length !== columnMetadataLength
                 || tableColumn.width !== columnMetadata.width
-                || tableColumn.precision !== columnMetadata.precision
+                || tableColumn.precision !== ((tableColumn.type === "timestamp" && !columnMetadata.precision) ? 0 : columnMetadata.precision)
                 || tableColumn.scale !== columnMetadata.scale
                 || tableColumn.zerofill !== columnMetadata.zerofill
                 || tableColumn.unsigned !== columnMetadata.unsigned

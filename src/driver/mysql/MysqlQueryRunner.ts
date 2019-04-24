@@ -1165,7 +1165,7 @@ export class MysqlQueryRunner extends BaseQueryRunner implements QueryRunner {
             `\`kcu\`.\`REFERENCED_TABLE_NAME\`, \`kcu\`.\`REFERENCED_COLUMN_NAME\`, \`rc\`.\`DELETE_RULE\` \`ON_DELETE\`, \`rc\`.\`UPDATE_RULE\` \`ON_UPDATE\` ` +
             `FROM \`INFORMATION_SCHEMA\`.\`KEY_COLUMN_USAGE\` \`kcu\` ` +
             `INNER JOIN \`INFORMATION_SCHEMA\`.\`REFERENTIAL_CONSTRAINTS\` \`rc\` ON \`rc\`.\`constraint_name\` = \`kcu\`.\`constraint_name\` ` +
-            `WHERE ` + foreignKeysCondition;
+            `WHERE ` + foreignKeysCondition + ` GROUP BY \`kcu\`.\`TABLE_NAME\`, \`kcu\`.\`CONSTRAINT_NAME\`, \`kcu\`.\`REFERENCED_TABLE_SCHEMA\``;
         const [dbTables, dbColumns, dbPrimaryKeys, dbCollations, dbIndices, dbForeignKeys]: ObjectLiteral[][] = await Promise.all([
             this.query(tablesSql),
             this.query(columnsSql),
@@ -1180,6 +1180,8 @@ export class MysqlQueryRunner extends BaseQueryRunner implements QueryRunner {
             return [];
 
         const isMariaDb = this.driver.options.type === "mariadb";
+        
+        // let fff = 0;
 
         // create tables for loaded tables
         return Promise.all(dbTables.map(async dbTable => {
@@ -1216,18 +1218,33 @@ export class MysqlQueryRunner extends BaseQueryRunner implements QueryRunner {
                     const tableColumn = new TableColumn();
                     tableColumn.name = dbColumn["COLUMN_NAME"];
                     tableColumn.type = dbColumn["DATA_TYPE"].toLowerCase();
-
-                    if (dbColumn["COLUMN_DEFAULT"] === null
-                        || dbColumn["COLUMN_DEFAULT"] === undefined
-                        || (isMariaDb && dbColumn["COLUMN_DEFAULT"] === "NULL")) {
+    
+                    if (dbColumn["COLUMN_DEFAULT"] === null && dbColumn["DATA_TYPE"] === "timestamp") {
+                        tableColumn.default = "NULL";
+                        if (tableColumn.name === "sentAt") {
+                            console.log("1");
+                        }
+                    } else if (dbColumn["COLUMN_DEFAULT"] === null || dbColumn["COLUMN_DEFAULT"] === undefined || (isMariaDb && dbColumn["COLUMN_DEFAULT"] === "NULL")) {
                         tableColumn.default = undefined;
-
+                        if (tableColumn.name === "sentAt") {
+                            console.log("2");
+                        }
+                    } else if (dbColumn["COLUMN_DEFAULT"] === "CURRENT_TIMESTAMP") {
+                        tableColumn.default = dbColumn["COLUMN_DEFAULT"];
+                        if (tableColumn.name === "sentAt") {
+                            console.log("3");
+                        }
                     } else {
-                        tableColumn.default = dbColumn["COLUMN_DEFAULT"] === "CURRENT_TIMESTAMP" ? dbColumn["COLUMN_DEFAULT"] : `'${dbColumn["COLUMN_DEFAULT"]}'`;
+                        tableColumn.default = `'${dbColumn["COLUMN_DEFAULT"]}'`;
+                        if (tableColumn.name === "sentAt") {
+                            console.log("4");
+                        }
                     }
 
                     if (dbColumn["EXTRA"].indexOf("on update") !== -1) {
                         tableColumn.onUpdate = dbColumn["EXTRA"].substring(dbColumn["EXTRA"].indexOf("on update") + 10);
+                    } else if (dbColumn["DATA_TYPE"] === "timestamp") {
+                        // tableColumn.onUpdate = "NULL";
                     }
 
                     if (dbColumn["GENERATION_EXPRESSION"]) {
@@ -1280,10 +1297,18 @@ export class MysqlQueryRunner extends BaseQueryRunner implements QueryRunner {
                     }
 
                     if ((tableColumn.type === "datetime" || tableColumn.type === "time" || tableColumn.type === "timestamp")
-                        && dbColumn["DATETIME_PRECISION"] !== null && dbColumn["DATETIME_PRECISION"] !== undefined
-                        && !this.isDefaultColumnPrecision(table, tableColumn, parseInt(dbColumn["DATETIME_PRECISION"]))) {
+                        && dbColumn["DATETIME_PRECISION"] !== null && dbColumn["DATETIME_PRECISION"] !== undefined) {
                         tableColumn.precision = parseInt(dbColumn["DATETIME_PRECISION"]);
                     }
+    
+                    // if (tableColumn.name === "validTo" && fff === 0) {
+                    //     console.log("tableColumn - validTo", tableColumn);
+                    //     fff = 1;
+                    // }
+                    //
+                    // if (tableColumn.name === "sentAt") {
+                    //     console.log("tableColumn - sentAt", tableColumn);
+                    // }
 
                     return tableColumn;
                 });

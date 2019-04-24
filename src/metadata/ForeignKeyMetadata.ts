@@ -80,8 +80,8 @@ export class ForeignKeyMetadata {
         this.referencedEntityMetadata = options.referencedEntityMetadata;
         this.columns = options.columns;
         this.referencedColumns = options.referencedColumns;
-        this.onDelete = options.onDelete || "NO ACTION";
-        this.onUpdate = options.onUpdate || "NO ACTION";
+        this.onDelete = options.onDelete || "RESTRICT";
+        this.onUpdate = options.onUpdate || "RESTRICT";
         if (options.namingStrategy)
             this.build(options.namingStrategy);
     }

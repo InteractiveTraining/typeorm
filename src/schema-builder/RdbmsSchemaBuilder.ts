@@ -170,6 +170,29 @@ export class RdbmsSchemaBuilder implements SchemaBuilder {
             if (tableForeignKeysToDrop.length === 0)
                 return;
 
+            if (table.name === "course_instance_instructors_instructor") {
+                console.log(metadata.foreignKeys);
+                console.log("---------------------------");
+                console.log(table.foreignKeys);
+    
+                table.foreignKeys.map(tableForeignKey => {
+                    const metadataFK = metadata.foreignKeys.find(metadataForeignKey => metadataForeignKey.name === tableForeignKey.name);
+                    if (!metadataFK) {
+                        // console.log("-- 1 --");
+                    } else {
+                        if ((metadataFK.onDelete && metadataFK.onDelete !== tableForeignKey.onDelete)) {
+                            console.log("-- 2-table --", tableForeignKey.onDelete);
+                            console.log("-- 2-meta --", metadataFK.onDelete);
+                        }
+    
+                        if ((metadataFK.onUpdate && metadataFK.onUpdate !== tableForeignKey.onUpdate)) {
+                            console.log("-- 3-table --", tableForeignKey.onUpdate);
+                            console.log("-- 3-meta --", metadataFK.onUpdate);
+                        }
+                    }
+                    
+                });
+            }
             this.connection.logger.logSchemaBuild(`dropping old foreign keys of ${table.name}: ${tableForeignKeysToDrop.map(dbForeignKey => dbForeignKey.name).join(", ")}`);
 
             // drop foreign keys from the database
