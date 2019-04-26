@@ -657,44 +657,50 @@ export class ColumnMetadata {
         this.databaseNameWithoutPrefixes = connection.namingStrategy.columnName(this.propertyName, this.givenDatabaseName, []);
         return this;
     }
-
+    
     protected buildPropertyPath(): string {
         let path = "";
+        if (this.relationMetadata && this.relationMetadata.embeddedMetadata)
+            path += this.relationMetadata.embeddedMetadata.parentPropertyNames.join(".") + ".";
         if (this.embeddedMetadata && this.embeddedMetadata.parentPropertyNames.length)
-            path = this.embeddedMetadata.parentPropertyNames.join(".") + ".";
-
+            path += this.embeddedMetadata.parentPropertyNames.join(".") + ".";
         path += this.propertyName;
-
+        
         // we add reference column to property path only if this column is virtual
         // because if its not virtual it means user defined a real column for this relation
         // also we don't do it if column is inside a junction table
         if (!this.entityMetadata.isJunction && this.isVirtual && this.referencedColumn && this.referencedColumn.propertyName !== this.propertyName)
             path += "." + this.referencedColumn.propertyName;
-
+        
         return path;
     }
-
+    
     protected buildDatabasePath(): string {
         let path = "";
+        if (this.relationMetadata && this.relationMetadata.embeddedMetadata)
+            path += this.relationMetadata.embeddedMetadata.parentPropertyNames.join(".") + ".";
         if (this.embeddedMetadata && this.embeddedMetadata.parentPropertyNames.length)
-            path = this.embeddedMetadata.parentPropertyNames.join(".") + ".";
-
+            path += this.embeddedMetadata.parentPropertyNames.join(".") + ".";
         path += this.databaseName;
-
+        
         // we add reference column to property path only if this column is virtual
         // because if its not virtual it means user defined a real column for this relation
         // also we don't do it if column is inside a junction table
         if (!this.entityMetadata.isJunction && this.isVirtual && this.referencedColumn && this.referencedColumn.databaseName !== this.databaseName)
             path += "." + this.referencedColumn.databaseName;
-
+        
         return path;
     }
-
+    
     protected buildDatabaseName(connection: Connection): string {
-        let propertyNames = this.embeddedMetadata ? this.embeddedMetadata.parentPrefixes : [];
+        let propertyNames: string[] = [];
+        if (this.relationMetadata && this.relationMetadata.embeddedMetadata)
+            propertyNames = this.relationMetadata.embeddedMetadata.parentPrefixes;
+        if (this.embeddedMetadata)
+            propertyNames = [...propertyNames, ...this.embeddedMetadata.parentPrefixes];
         if (connection.driver instanceof MongoDriver) // we don't need to include embedded name for the mongodb column names
             propertyNames = [];
         return connection.namingStrategy.columnName(this.propertyName, this.givenDatabaseName, propertyNames);
     }
-
+    
 }
